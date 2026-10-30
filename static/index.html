@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TinyGuard — Real Network Monitor</title>
+<style>
+:root{--bg:#0a1020;--panel:#111b30;--line:#263752;--text:#eff5ff;--muted:#9aabc5;--teal:#45d6bd;--amber:#ffbd67;--red:#ff687b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#172745 0,transparent 45%),var(--bg);font:14px/1.45 Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+header{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#45d6bd,#2d86c9);display:grid;place-items:center;color:#071322;font-weight:900;font-size:19px}
+h1{font-size:21px;margin:0} .sub{color:var(--muted);margin-top:3px;font-size:12px}
+main{max-width:1400px;margin:auto;padding:22px;display:grid;gap:16px}
+.notice{border:1px solid #705a32;background:#241f18;color:#ffe2ad;padding:13px 15px;border-radius:12px}
+.toolbar,.card{background:rgba(17,27,48,.94);border:1px solid var(--line);border-radius:16px;padding:17px}
+.toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.field{display:grid;gap:6px;min-width:230px;flex:1}label{color:var(--muted);font-size:12px}input{background:#091326;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px 12px;font:inherit}
+button,.btn{border:1px solid var(--line);background:#1b2c47;color:var(--text);padding:10px 14px;border-radius:10px;font-weight:650;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button.primary{background:var(--teal);color:#05201d;border-color:var(--teal)}button:disabled{opacity:.5;cursor:wait}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric{min-height:120px}.kicker{color:var(--muted);font-size:12px}.value{font-size:29px;font-weight:750;margin:12px 0 4px;letter-spacing:-.7px}.unit{font-size:13px;color:var(--muted);font-weight:500}.hint{font-size:12px;color:var(--muted)}
+.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.card h2{font-size:15px;margin:0 0 14px}.statusline{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.pill{font-size:11px;font-weight:800;letter-spacing:.3px;padding:6px 9px;border-radius:100px;background:#163d38;color:var(--teal)}.pill.warn{background:#4a341d;color:var(--amber)}.pill.bad{background:#4c202d;color:var(--red)}
+.bar{height:9px;background:#26344c;border-radius:100px;overflow:hidden;margin:12px 0}.bar>div{height:100%;width:5%;background:var(--teal);transition:width .2s}.reason{padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-top:8px;color:#d7e3f7}
+.chart{height:210px;width:100%;display:block}.legend{color:var(--muted);font-size:12px;display:flex;gap:14px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);margin-right:5px}
+table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 8px;vertical-align:top}th{color:var(--muted);font-weight:600}td{overflow-wrap:anywhere}
+.footer{color:var(--muted);font-size:12px;text-align:center;padding:10px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}@media(max-width:520px){main{padding:12px}.grid{grid-template-columns:1fr 1fr}.value{font-size:24px}header{padding:17px}}
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="logo">TG</div><div><h1>TinyGuard <span style="color:#45d6bd">/ Real Monitor</span></h1><div class="sub">Local telemetry · Your current machine and selected network target</div></div></div><div class="sub" id="host">Connecting to local monitor…</div></header>
+<main>
+<div class="notice"><b>Live data, not demo data.</b> Values come from this computer and real ping probes. The risk indicator uses transparent rules and a recent latency baseline; it is not a trained failure-prediction model. One failed ping is only one failed probe, not proof of sustained packet loss.</div>
+<section class="toolbar">
+<div class="field"><label for="target">Ping target (IP or hostname)</label><input id="target" value="1.1.1.1" autocomplete="off"><div class="hint">Choose a target you are permitted to test, such as your router IP or a public DNS server.</div></div>
+<button class="primary" id="start">▶ Start monitoring</button><button id="once">Take one sample</button><button id="stop" disabled>Ⅱ Pause</button><button id="clear">Clear history</button><a class="btn" href="/api/export.csv">Export CSV</a>
+</section>
+<section class="grid">
+<div class="card metric"><div class="kicker">Ping latency</div><div class="value" id="latency">— <span class="unit">ms</span></div><div class="hint" id="latencyHint">Waiting for first sample</div></div>
+<div class="card metric"><div class="kicker">Last ping result</div><div class="value" id="reach">—</div><div class="hint" id="pingHint">Actual ICMP probe</div></div>
+<div class="card metric"><div class="kicker">CPU utilization</div><div class="value" id="cpu">— <span class="unit">%</span></div><div class="hint">Measured on this computer</div></div>
+<div class="card metric"><div class="kicker">Memory utilization</div><div class="value" id="mem">— <span class="unit">%</span></div><div class="hint">System memory in use</div></div>
+</section>
+<section class="layout">
+<div class="card"><div class="statusline"><h2>Latency over time</h2><div class="legend"><span><i class="dot"></i>Measured latency</span></div></div><canvas class="chart" id="chart"></canvas><div class="hint">Only successful measured pings are plotted. A gap means no successful latency measurement.</div></div>
+<div class="card"><h2>Current network health assessment</h2><div class="statusline"><div id="status" class="pill">WAITING FOR DATA</div><b id="risk">—</b></div><div class="bar"><div id="riskbar"></div></div><div class="hint">Rule-based risk indicator — not a probability of failure.</div><div id="reasons"><div class="reason">Take a sample to see evidence.</div></div></div>
+</section>
+<section class="grid">
+<div class="card metric"><div class="kicker">Received traffic rate</div><div class="value" id="rx">—</div><div class="hint">Bytes per second on all interfaces</div></div>
+<div class="card metric"><div class="kicker">Sent traffic rate</div><div class="value" id="tx">—</div><div class="hint">Bytes per second on all interfaces</div></div>
+<div class="card metric"><div class="kicker">Samples recorded</div><div class="value" id="samples">0</div><div class="hint">Kept in local app memory</div></div>
+<div class="card metric"><div class="kicker">Network interfaces</div><div class="value" id="ifaces">—</div><div class="hint" id="platform">Local system details</div></div>
+</section>
+<section class="card"><h2>Recent samples</h2><div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Target</th><th>Latency</th><th>CPU</th><th>Memory</th><th>Assessment</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="hint">No samples yet. Start monitoring.</td></tr></tbody></table></div></section>
+<section class="card"><h2>How this works</h2>
+<ol style="color:#c7d4e9;padding-left:20px">
+<li><b>Local metrics:</b> Python's psutil reads CPU, memory, and interface byte counters from your computer.</li>
+<li><b>Connection probe:</b> TinyGuard sends one OS-level ping to your selected target and records the measured round-trip time or failure.</li>
+<li><b>Baseline:</b> Successful latency samples are kept to calculate a recent median after enough samples arrive.</li>
+<li><b>Assessment:</b> Explicit thresholds flag very high latency, a failed probe, or high CPU/memory. A sudden rise relative to the recent median can also be flagged.</li>
+<li><b>History/export:</b> Samples are kept in memory while the app runs and can be exported to CSV. Clearing or restarting removes this temporary history.</li>
+</ol><div class="hint">Privacy: this local app does not upload telemetry. It does not capture packet contents, passwords, browsing history, or other people's traffic. A ping target may see normal ICMP requests from your connection.</div>
+</section>
+<div class="footer">TinyGuard local prototype · No synthetic telemetry is generated · Rule-based monitoring only</div>
+</main>
+<script>
+let running=false, timer=null, samples=[];
+const $=id=>document.getElementById(id);
+function fmtBytes(n){if(n==null)return "—";let units=["B/s","KB/s","MB/s","GB/s"],i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+" "+units[i]}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function pillClass(status){if(status==="NO ISSUE DETECTED")return "";if(status==="ANOMALY"||status==="LOCAL RESOURCE PRESSURE")return "warn";return "bad"}
+function drawChart(){
+ const c=$("chart"), dpr=window.devicePixelRatio||1, rect=c.getBoundingClientRect();
+ c.width=Math.max(300,rect.width*dpr);c.height=210*dpr;const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
+ const w=c.width/dpr,h=210, pad={l:38,r:10,t:14,b:28}, pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+ ctx.clearRect(0,0,w,h);ctx.font="11px Segoe UI";ctx.strokeStyle="#263752";ctx.fillStyle="#9aabc5";ctx.lineWidth=1;
+ const vals=samples.slice(-45).map(s=>s.latency_ms).filter(v=>v!=null);
+ const max=Math.max(100,...vals)*1.15;
+ for(let i=0;i<=4;i++){let y=pad.t+ph*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(Math.round(max*(1-i/4))+" ms",2,y+4)}
+ let prev=null;const arr=samples.slice(-45);
+ arr.forEach((s,i)=>{if(s.latency_ms==null){prev=null;return}let x=pad.l+(arr.length<=1?0:i/(arr.length-1)*pw),y=pad.t+ph*(1-s.latency_ms/max);if(prev){ctx.strokeStyle="#45d6bd";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(x,y);ctx.stroke()}ctx.fillStyle="#45d6bd";ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();prev={x,y}});
+ ctx.fillStyle="#9aabc5";ctx.fillText("Older",pad.l,h-7);ctx.fillText("Latest",w-48,h-7);
+}
+async function takeSample(){
+ const btn=$("once");btn.disabled=true;
+ try{
+   const target=$("target").value.trim()||"1.1.1.1";
+   const r=await fetch("/api/sample?target="+encodeURIComponent(target));if(!r.ok)throw Error("API error "+r.status);
+   const d=await r.json();samples.push(d);if(samples.length>180)samples.shift();render(d);
+ }catch(e){$("status").textContent="MONITOR ERROR";$("reasons").innerHTML='<div class="reason">'+esc(e.message)+'</div>'}
+ finally{btn.disabled=false}
+}
+function render(d){
+ $("latency").innerHTML=(d.latency_ms==null?"—":d.latency_ms.toFixed(1))+' <span class="unit">ms</span>';
+ $("latencyHint").textContent=d.ping_error||("Measured to "+d.target);
+ $("reach").textContent=d.target_reachable?"REACHABLE":"NO REPLY";
+ $("reach").style.color=d.target_reachable?"#45d6bd":"#ff687b";
+ $("pingHint").textContent=d.target_reachable?"ICMP response received":"This probe did not receive a reply";
+ $("cpu").innerHTML=d.cpu_percent+' <span class="unit">%</span>';$("mem").innerHTML=d.memory_percent+' <span class="unit">%</span>';
+ $("rx").textContent=fmtBytes(d.rx_bytes_per_sec);$("tx").textContent=fmtBytes(d.tx_bytes_per_sec);
+ $("samples").textContent=samples.length;$("ifaces").textContent=d.interfaces.length;$("platform").textContent=d.hostname+" · "+d.platform;
+ $("status").textContent=d.status;$("status").className="pill "+pillClass(d.status);
+ $("risk").textContent=d.risk_score+"/100";$("riskbar").style.width=d.risk_score+"%";
+ $("riskbar").style.background=d.risk_score>=60?"#ff687b":d.risk_score>=35?"#ffbd67":"#45d6bd";
+ $("reasons").innerHTML=d.reasons.map(r=>'<div class="reason">'+esc(r)+'</div>').join("");
+ $("rows").innerHTML=samples.slice(-12).reverse().map(s=>'<tr><td>'+esc(s.timestamp)+'</td><td>'+esc(s.target)+'</td><td>'+(s.latency_ms==null?'—':s.latency_ms.toFixed(1)+' ms')+'</td><td>'+s.cpu_percent+'%</td><td>'+s.memory_percent+'%</td><td>'+esc(s.status)+'</td></tr>').join("");
+ drawChart();
+}
+async function loadHealth(){try{const d=await(await fetch("/api/health")).json();$("host").textContent=d.hostname+" · "+d.platform;$("platform").textContent=d.platform}catch(e){$("host").textContent="Local API unavailable"}}
+$("once").addEventListener("click",takeSample);
+$("start").addEventListener("click",()=>{if(running)return;running=true;$("start").disabled=true;$("stop").disabled=false;takeSample();timer=setInterval(takeSample,3000)});
+$("stop").addEventListener("click",()=>{running=false;clearInterval(timer);timer=null;$("start").disabled=false;$("stop").disabled=true});
+$("clear").addEventListener("click",async()=>{await fetch("/api/clear",{method:"POST"});samples=[];$("samples").textContent="0";$("rows").innerHTML='<tr><td colspan="6" class="hint">History cleared.</td></tr>';$("reasons").innerHTML='<div class="reason">History cleared. Take a new sample.</div>';drawChart()});
+window.addEventListener("resize",drawChart);loadHealth();drawChart();
+</script>
+</body></html>
